@@ -1,0 +1,21 @@
+{
+    "name": "ndof-core-utils",
+    // Digest-pinned dev environment. NOTE: Dependabot does not scan
+    // devcontainer.json — when a ci.yml pin PR bumps the environment,
+    // update this digest in the same PR to keep local and CI identical.
+    "image": "ghcr.io/ndof-opensource/ndof-dev@sha256:eb3a71a32d2258a5b62f0a2608e4912f207f7f31194c118b097587a715a2c229",
+    "remoteUser": "dev",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "llvm-vs-code-extensions.vscode-clangd",
+                "ms-vscode.cmake-tools"
+            ],
+            "settings": {
+                "clangd.arguments": [
+                    "--compile-commands-dir=${workspaceFolder}/build/Debug"
+                ]
+            }
+        }
+    }
+}
