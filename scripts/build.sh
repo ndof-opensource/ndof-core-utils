@@ -57,7 +57,7 @@ cd "$(dirname "$0")/.."
 # container user's uid to the host user's (updateRemoteUserUID); a raw
 # `docker run` or a buggy editor integration does not.
 if [[ ! -w . ]]; then
-    echo "error: $PWD is not writable by $(id -un 2>/dev/null || echo unknown) (uid $(id -u))" >&2
+    echo "error: $PWD is not writable by $(id -un) (uid $(id -u))" >&2
     echo "This is usually a bind-mount uid mismatch — see the pitfalls in" >&2
     echo "ndof-infra/docs/onboarding.md. Do not 'fix' it with chmod -R 777:" >&2
     echo "that marks every tracked file as modified (mode changes) in git." >&2
