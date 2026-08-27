@@ -3,11 +3,11 @@ from conan.tools.cmake import CMake, cmake_layout
 
 
 class Package(ConanFile):
-    name = "ndof-core-utils"
+    name = "ndof-core"
     version = "0.1.0"
     description = "Foundational utilities for the ndof framework family"
     license = "Apache-2.0"
-    url = "https://github.com/ndof-opensource/ndof-core-utils"
+    url = "https://github.com/ndof-opensource/ndof-core"
     topics = ("ndof",)
 
     settings = "os", "arch", "compiler", "build_type"
@@ -46,6 +46,6 @@ class Package(ConanFile):
         cmake.install()
 
     def package_info(self):
-        self.cpp_info.libs = ["ndof-core-utils"]
-        self.cpp_info.set_property("cmake_file_name", "ndof-core-utils")
-        self.cpp_info.set_property("cmake_target_name", "ndof::core-utils")
+        self.cpp_info.libs = ["ndof-core"]
+        self.cpp_info.set_property("cmake_file_name", "ndof-core")
+        self.cpp_info.set_property("cmake_target_name", "ndof::core")

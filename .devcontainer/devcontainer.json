@@ -1,5 +1,5 @@
 {
-    "name": "ndof-core-utils",
+    "name": "ndof-core",
     // Digest-pinned dev environment. NOTE: Dependabot does not scan
     // devcontainer.json — when a ci.yml pin PR bumps the environment,
     // update this digest in the same PR to keep local and CI identical.
