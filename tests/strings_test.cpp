@@ -1,7 +1,7 @@
 // Copyright 2026 The ndof Authors
 // SPDX-License-Identifier: Apache-2.0
 
-#include "ndof/core_utils/strings.hpp"
+#include "ndof/core/strings.hpp"
 
 #include <gtest/gtest.h>
 
@@ -9,9 +9,9 @@
 
 namespace {
 
-using ndof::core_utils::trim;
-using ndof::core_utils::trim_left;
-using ndof::core_utils::trim_right;
+using ndof::core::trim;
+using ndof::core::trim_left;
+using ndof::core::trim_right;
 
 TEST(Trim, EmptyInput) {
     EXPECT_EQ(trim(""), "");

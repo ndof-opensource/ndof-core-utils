@@ -1,4 +1,4 @@
-# ndof-core-utils
+# ndof-core
 
 Foundational utilities for the ndof framework family
 
@@ -46,12 +46,12 @@ and clang-tidy gates.
 As a Conan package:
 
 ```
-requires = "ndof-core-utils/0.1.0"
+requires = "ndof-core/0.1.0"
 ```
 
 Or as a plain CMake package (no package manager required):
 
 ```cmake
-find_package(ndof-core-utils REQUIRED)
-target_link_libraries(your_target PRIVATE ndof::core-utils)
+find_package(ndof-core REQUIRED)
+target_link_libraries(your_target PRIVATE ndof::core)
 ```

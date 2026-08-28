@@ -5,12 +5,12 @@
 
 #include <string_view>
 
-namespace ndof::core_utils {
+namespace ndof::core {
 
-/// Name of this library as published (e.g. "ndof-core-utils").
+/// Name of this library as published (e.g. "ndof-core").
 [[nodiscard]] std::string_view library_name() noexcept;
 
 /// Semantic version of this library (e.g. "0.1.0").
 [[nodiscard]] std::string_view library_version() noexcept;
 
-} // namespace ndof::core_utils
+} // namespace ndof::core

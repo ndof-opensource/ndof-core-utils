@@ -5,7 +5,7 @@
 
 #include <string_view>
 
-namespace ndof::core_utils {
+namespace ndof::core {
 
 /// The whitespace set used by the trim functions: space, \t, \n, \r, \f, \v.
 inline constexpr std::string_view whitespace = " \t\n\r\f\v";
@@ -20,4 +20,4 @@ inline constexpr std::string_view whitespace = " \t\n\r\f\v";
 /// Returns `s` with leading and trailing whitespace removed.
 [[nodiscard]] std::string_view trim(std::string_view s) noexcept;
 
-} // namespace ndof::core_utils
+} // namespace ndof::core

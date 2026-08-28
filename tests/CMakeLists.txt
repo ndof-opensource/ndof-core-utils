@@ -5,7 +5,7 @@ add_executable(unit_tests
     version_test.cpp)
 
 target_link_libraries(unit_tests PRIVATE
-    ndof::core-utils
+    ndof::core
     GTest::gtest_main)
 
 include(GoogleTest)
