@@ -4,7 +4,7 @@ from conan.tools.cmake import CMake, cmake_layout
 
 class Package(ConanFile):
     name = "ndof-core"
-    version = "0.1.0"
+    version = "0.1.1"
     description = "Foundational utilities for the ndof framework family"
     license = "Apache-2.0"
     url = "https://github.com/ndof-opensource/ndof-core"
