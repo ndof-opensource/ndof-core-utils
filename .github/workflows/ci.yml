@@ -10,4 +10,4 @@ jobs:
     # Pinned CI logic: this workflow-ref SHA is bumped by hand (Dependabot
     # cannot track a tagless repo). The image digest lives only in
     # .devcontainer/devcontainer.json; CI reads it from there.
-    uses: ndof-opensource/ndof-infra/.github/workflows/ci.yml@f07d8ea5f1a160413711bb60ca111f6a17efbf73 # main 2026-08-28
+    uses: ndof-opensource/ndof-infra/.github/workflows/ci.yml@e274eb3e298e3b61265d88001e1708109917952b # main 2026-09-02
