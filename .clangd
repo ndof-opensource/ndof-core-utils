@@ -4,3 +4,4 @@
 # of scripts/build.sh to exist; sanitizer presets share these flags anyway.
 CompileFlags:
   CompilationDatabase: build/Debug
+  Add: [-std=c++23]

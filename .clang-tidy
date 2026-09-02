@@ -10,6 +10,7 @@ Checks: >
   performance-*,
   portability-*,
   readability-*,
+  -readability-convert-member-functions-to-static,
   -modernize-use-trailing-return-type,
   -readability-identifier-length,
   -readability-magic-numbers,
