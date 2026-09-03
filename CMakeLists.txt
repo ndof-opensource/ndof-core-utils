@@ -1,5 +1,15 @@
 cmake_minimum_required(VERSION 3.28)
 
+# Conan generates the toolchain file this project is configured with. When a
+# tool (an IDE's CMake integration, a bare cmake invocation) configures an
+# unbootstrapped tree, fail with the fix instead of three cryptic errors.
+if(CMAKE_TOOLCHAIN_FILE AND NOT EXISTS "${CMAKE_TOOLCHAIN_FILE}")
+    message(FATAL_ERROR
+        "Conan has not generated ${CMAKE_TOOLCHAIN_FILE} yet. Run "
+        "scripts/build.sh debug (or: conan install . --build=missing) first. "
+        "See this repository's README, or the ndof-infra onboarding guide.")
+endif()
+
 project(ndof-core
     VERSION 0.1.0
     DESCRIPTION "Foundational utilities for the ndof framework family"
@@ -9,8 +19,10 @@ project(ndof-core
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
-# This project does not use C++20 modules; CMake 3.28+ module scanning also
-# injects compiler flags that clang-tidy cannot parse.
+# This project does not currently use C++20 modules;
+# CMake 3.28+ module scanning also injects compiler flags that
+# clang-tidy cannot parse.
+# If C++20 modules are introduced, delete this line.
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
 option(NDOF_BUILD_TESTS "Build unit tests" ${PROJECT_IS_TOP_LEVEL})
