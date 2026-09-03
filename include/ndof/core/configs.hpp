@@ -131,8 +131,8 @@ using default_char_t = NDOF_DEFAULT_CHAR_TYPE;
 #define NDOF_DEFAULT_CHAR_TRAITS_TYPE std::char_traits 
 #endif 
 
-template<typename CharT>
-using default_char_traits_t = NDOF_DEFAULT_CHAR_TRAITS_TYPE<CharT>;
+template<typename CharT, template<typename> class Traits = NDOF_DEFAULT_CHAR_TRAITS_TYPE>
+using default_char_traits_t = Traits<CharT>;
 
 // Determine the build mode based on standard compiler switches.
 // - NDEBUG defined typically indicates a release build (assert() is a no-op).
