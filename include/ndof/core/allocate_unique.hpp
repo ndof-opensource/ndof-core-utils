@@ -1,254 +1,269 @@
 #include "configs.hpp"
+#include "allocator_support.hpp"
+#include "definitions.hpp"
 
 #include <cstddef>
 #include <cstdint>
-#include <exception>
+ 
 #include <expected>
 #include <memory>
 #include <type_traits>
 
-// TODO: Move these to core.
-// TODO: Update to use try/catch blocks if exceptions are enabled, and use std::terminate() if exceptions are disabled.
-template<class T>
-concept bounded_array = std::is_bounded_array_v<T>;
+namespace ndof {
 
-template<class T>
-concept unbounded_array = std::is_unbounded_array_v<T>;
+        enum allocation_error : std::uint8_t {
+            allocation_failed
+        };
+        
+        namespace detail {
 
-enum class allocation_error : std::uint8_t {
-    allocation_failed
-};
 
-namespace allocation_detail {
+        // Note: This should be a soft standard for us: Mark destroy functions noexcept if exceptions are disabled,
+        //       unless there is a good reason not to.
+        template<typename T, typename Alloc>
+        void deallocate_and_destroy(Alloc& alloc, std::remove_extent_t<T>* pointer, std::size_t count) noexcept(!ndof::exceptions_feature_enabled()) {
+            using traits = std::allocator_traits<Alloc>;
 
-template<class T, class Alloc>
-void destroy(Alloc& alloc, std::remove_extent_t<T>* pointer, std::size_t count) {
-    using traits = std::allocator_traits<Alloc>;
+            if constexpr (std::is_array_v<T>) {
+                std::destroy_n(pointer, count);
+                traits::deallocate(alloc, pointer, count);
+            }
+            else {
+                std::destroy_at(pointer);
+                traits::deallocate(alloc, pointer, 1);
+            }
+        } 
 
-    if constexpr (std::is_array_v<T>) {
-        for (std::size_t i = 0; i < count; ++i)
-            traits::destroy(alloc, pointer + i);
+        template<typename T, typename A, typename ...Args>
+        consteval bool ctor_is_noexcept() {
+            using traits = std::allocator_traits<A>;
+            return noexcept(traits::construct(std::declval<A&>(), std::declval<traits::pointer>(), std::declval<Args>()...));
+        }
 
-        traits::deallocate(alloc, pointer, count);
-    }
-    else {
-        traits::destroy(alloc, pointer);
-        traits::deallocate(alloc, pointer, 1);
-    }
-}
+        template<typename T, typename Alloc, typename... Args>
+        void construct(Alloc& alloc, T* pointer, Args&&... args) noexcept(!ndof::exceptions_feature_enabled() || ctor_is_noexcept<T, Alloc, Args...>()) {
+            using traits = std::allocator_traits<Alloc>;
+            // Note: This will throw an exception if the constructor of T throws an exception.  
+            //       If exceptions are disabled, this will call std::terminate()
+            traits::construct(alloc, pointer, std::forward<Args>(args)...);
+        }
 
-// Question: Aren't these #if cases redundant?  We already have a concept that checks for exceptions being enabled or not. 
-//              Why do we need to check again here?  
-//              I think we can remove these #if cases and just use the concept.  
-//              Can't remember why I added these.
-
- 
-template<class T, class Alloc>
-void destroy_or_terminate(
-    Alloc& alloc, std::remove_extent_t<T>* pointer, std::size_t count) noexcept {
-#if defined(NDOF_EXCEPTIONS_FEATURE_ENABLED) && NDOF_EXCEPTIONS_FEATURE_ENABLED == 1
- 
-    try {
-#endif
-        destroy<T>(alloc, pointer, count);
-#if defined(NDOF_EXCEPTIONS_FEATURE_ENABLED) && NDOF_EXCEPTIONS_FEATURE_ENABLED == 1
-    }
-    catch (...) {
-        // This method is noexcept, so we can't throw.  We have to terminate the program.
-        std::terminate();
-    }
-#endif
-}
-
-// TODO: Bring result_t into core and use it here.  This will allow us to return an error code instead of throwing an exception when exceptions are disabled.
-template<class T, class Alloc, class... Args>
-result_t<bool> construct_or_rethrow(Alloc& alloc, T* pointer, Args&&... args) {
-    using traits = std::allocator_traits<Alloc>;
-
-    try {
-        traits::construct(alloc, pointer, std::forward<Args>(args)...);
-    }
-    catch (...) {
-        traits::deallocate(alloc, pointer, 1);
-        throw;
-    }
-}
-
-template<class T, class Alloc>
-void construct_array_or_rethrow(Alloc& alloc, T* pointer, std::size_t count) {
-    using traits = std::allocator_traits<Alloc>;
-    std::size_t constructed = 0;
-
-    try {
-        for (; constructed < count; ++constructed)
-            traits::construct(alloc, pointer + constructed);
-    }
-    catch (...) {
-        while (constructed != 0)
-            traits::destroy(alloc, pointer + --constructed);
-        traits::deallocate(alloc, pointer, count);
-        throw;
-    }
-}
-#else
-template<class...>
-inline constexpr bool dependent_false = false;
-
-template<class T, class Alloc>
-void destroy_or_terminate(
-    Alloc&, std::remove_extent_t<T>*, std::size_t) noexcept {
-    static_assert(dependent_false<T>,
-                  "destroy_or_terminate requires exception support");
-}
-
-template<class T, class Alloc, class... Args>
-void construct_or_rethrow(Alloc&, T*, Args&&...) {
-    static_assert(dependent_false<T>,
-                  "construct_or_rethrow requires exception support");
-}
-
-template<class T, class Alloc>
-void construct_array_or_rethrow(Alloc&, T*, std::size_t) {
-    static_assert(dependent_false<T>,
-                  "construct_array_or_rethrow requires exception support");
-}
-#endif
-
-} // namespace allocation_detail
-
-template<class T, class Alloc >
-struct deallocating_deleter {
-    using element_type = std::remove_extent_t<T>;
-    using pointer = element_type*;
-
-    using allocator_type =
-        typename std::allocator_traits<Alloc>::template rebind_alloc<element_type>;
+        template<typename T, typename Alloc>
+        void construct_array([[maybe_unused]] Alloc& alloc, T* pointer, std::size_t count) noexcept(!ndof::exceptions_feature_enabled()) {
+            // Handles destroying already-constructed elements on exception; caller still owns deallocation.
+            std::uninitialized_value_construct_n(pointer, count);
+        }
+   
+    
+    } // namespace ndof::detail
 
     
-    [[no_unique_address]] allocator_type alloc;
-    std::size_t count = 1;
 
-    consteval bool allocator_is_nothrow_deallocate() const noexcept {
-        return noexcept(alloc.deallocate(std::declval<pointer>(), count));
-    }
+    // There is a memory penalty here that is unavoidable. 
+    // In order to achieve type erasure of the allocator,
+    // we need to store a type-erased version of the allocator along with the allocation count.
+    template<typename T>
+    struct deallocating_deleter {
+    public:
+        using element_type = std::remove_extent_t<T>;
+        using pointer = element_type*;
 
-    consteval bool is_no_throw() const noexcept {
-         return (!ndof::exceptions_feature_enabled()) || allocator_is_nothrow_deallocate();
-    }
+    private:
+        struct allocator_state {
+            allocator_state() = default;
+            allocator_state(const allocator_state&) = delete;
+            allocator_state& operator=(const allocator_state&) = delete;
+            allocator_state(allocator_state&&) = delete;
+            allocator_state& operator=(allocator_state&&) = delete;
+            virtual ~allocator_state() = default;
 
-    // Note: The noexcept specifier is conditional on whether exceptions are enabled or not 
-    //    and whether the allocator's deallocate method is noexcept or not.
-    //    This is added so that the two operator() overloads have the same signature, 
-    //    and the noexcept specifier is not part of the function signature.
-    //    I'm not sure this is necessary and I can test it without.
-    void operator()(element_type* p) noexcept(is_no_throw())
-    requires (is_no_throw())
+            virtual std::unique_ptr<allocator_state> clone() const = 0;
+            virtual void deallocate_and_destroy(pointer p) noexcept = 0;
+        };
+
+        template<typename Alloc>
+        struct allocator_state_for final : allocator_state {
+            using allocator_type =
+                typename std::allocator_traits<Alloc>::template rebind_alloc<element_type>;
+
+            allocator_state_for(Alloc allocator)
+                : alloc(std::move(allocator))  {}
+
+            std::unique_ptr<allocator_state> clone() const override {
+                return std::make_unique<allocator_state_for>(alloc, 1);
+            }
+
+            void deallocate_and_destroy(pointer p) noexcept override {
+                detail::deallocate_and_destroy<T>(alloc, p, 1);
+            }
+
+        private:
+            [[no_unique_address]] allocator_type alloc;
+        };
+
+                template<typename Alloc>
+        struct allocator_state_with_count_for final : allocator_state {
+            using allocator_type =
+                typename std::allocator_traits<Alloc>::template rebind_alloc<element_type>;
+
+            allocator_state_with_count_for(Alloc allocator, std::size_t allocation_count)
+                : alloc(std::move(allocator)), count(allocation_count) {}
+
+            std::unique_ptr<allocator_state> clone() const override {
+                return std::make_unique<allocator_state_with_count_for<Alloc>>(alloc, count);
+            }
+
+            void deallocate_and_destroy(pointer p) noexcept override {
+                detail::deallocate_and_destroy<T>(alloc, p, count);
+            }
+
+        private:
+            [[no_unique_address]] allocator_type alloc;
+            std::size_t count;
+        };
+
+        std::unique_ptr<allocator_state> state;
+ 
+        template<typename Alloc>
+        std::unique_ptr<allocator_state> initialize_state(Alloc alloc, std::size_t count) {
+            return count == 1 ? std::make_unique<allocator_state_for<Alloc>>(std::move(alloc))
+                               : std::make_unique<allocator_state_with_count_for<Alloc>>(std::move(alloc), count);
+        }
+
+    public:
+        deallocating_deleter() = default;
+        ~deallocating_deleter() = default;
+
+        template<typename Alloc>
+        explicit deallocating_deleter([[maybe_unused]] Alloc alloc, std::size_t count = 1)
+            : state(initialize_state(std::move(alloc), count)) {
+                  }
+
+        // TODO: Probably should be icloneable? But then we'd have to start worrying about
+        //       a lot of circular dependencies. And then we'd have to create additional
+        //       abstractions.  This might be the right path on a number of fronts.
+        //       This might include elevating ndof::error as well.
+        deallocating_deleter(const deallocating_deleter& other)
+            : state(other.state ? other.state->clone() : nullptr) {}
+
+        deallocating_deleter& operator=(const deallocating_deleter& other) {
+            if (this != &other) {
+                auto replacement =
+                    other.state ? other.state->clone() : nullptr;
+                state = std::move(replacement);
+            }
+            return *this;
+        }
+
+        deallocating_deleter(deallocating_deleter&&) noexcept = default;
+        deallocating_deleter& operator=(deallocating_deleter&&) noexcept = default;
+
+        void operator()(pointer p) const noexcept {
+            if (p != nullptr) {
+                    state->deallocate_and_destroy(p);
+            }
+        }
+    };
+
+    template<typename T>
+    using allocated_unique_ptr = std::unique_ptr<T, deallocating_deleter<T>>;
+
+    template<typename T>
+    using allocation_result_t = std::conditional_t<
+        ndof::exceptions_feature_enabled(),
+        allocated_unique_ptr<T>,
+        std::expected<allocated_unique_ptr<T>, allocation_error>>;
+
+    template<typename T, typename Alloc, typename... Args>
+        requires (!std::is_array_v<T>)
+    auto make_unique_with_allocator(Alloc alloc, Args&&... args)
+        noexcept(!ndof::exceptions_feature_enabled())
+        -> allocation_result_t<T>
     {
-        if (!p)
-            return;
+        using A = typename std::allocator_traits<Alloc>::template rebind_alloc<T>;
+        using traits = std::allocator_traits<A>;
 
-        allocation_detail::destroy_or_terminate<T>(alloc, p, count);
+        A a{alloc};
+        deallocating_deleter<T> deleter{a};
+        T* p = traits::allocate(a, 1);
+
+        if constexpr (ndof::exceptions_feature_enabled()) {
+#if defined(NDOF_EXCEPTIONS_FEATURE_ENABLED) && NDOF_EXCEPTIONS_FEATURE_ENABLED == 1
+            try {
+                detail::construct(
+                    a, p, std::forward<Args>(args)...);
+            }
+            catch (...) {
+                traits::deallocate(a, p, 1);
+                throw;
+            }
+#endif
+        }
+        else {
+            if (p == nullptr) {
+                return std::unexpected(allocation_error::allocation_failed);
+            }
+            // Will terminate if this fails. No need to deallocate manually.
+            traits::construct(a, p, std::forward<Args>(args)...);
+        }
+
+        return allocated_unique_ptr<T>{p, std::move(deleter)};
     }
 
-
-    void operator()(element_type* p) noexcept(is_no_throw())
-    requires (!is_no_throw())
+    template<bounded_array T, allocator_like Alloc>
+    auto make_unique_with_allocator(Alloc alloc) noexcept(!ndof::exceptions_feature_enabled())
+        -> allocation_result_t<T>
     {
-        if (!p)
-            return;
+        using element_type = std::remove_extent_t<T>;
+        using A = typename std::allocator_traits<Alloc>::template rebind_alloc<element_type>;
+        using traits = std::allocator_traits<A>;
 
-        allocation_detail::destroy<T>(alloc, p, count);
-    }
-};
+        A a{alloc};
+        constexpr std::size_t count = std::extent_v<T>;
+        element_type* p = traits::allocate(a, count);
 
-template<class T, class Alloc>
-using allocated_unique_t = std::unique_ptr<T, deallocating_deleter<T, Alloc>>;
+        if constexpr (ndof::exceptions_feature_enabled()) {
+            // An exception will be thrown if p is null or if construction fails.
+            detail::construct_array(a, p, count);
+        }
+        else {
+            if (!p) {
+                return std::unexpected(allocation_error::allocation_failed);
+            }
+            detail::construct_array(a, p, count);
 
-// TODO: Consider the case that T is a reference or rvalue reference.
-//       We'll create another using alias for that case by using std::reference_wrapper<T> as the type of the unique_ptr,
-//       and the deleter will be a no-op deleter.  We'll also need to consider the case that T is a reference or rvalue reference to an array type.
-//       Use requires clauses to constrain the using alias templates to the appropriate cases.  
-//       We'll also need to consider the case that T is a reference or rvalue reference to an array type.
-template<class T, class Alloc>
-using allocation_result_t = std::conditional_t<
-    ndof::exceptions_feature_enabled(),
-    allocated_unique_t<T, Alloc>,
-    std::expected<allocated_unique_t<T, Alloc>, allocation_error>>;
+        }
 
-template<class T, class Alloc, class... Args>
-    requires (!std::is_array_v<T>)
-auto make_unique_with_allocator(Alloc alloc, Args&&... args)
-    -> allocation_result_t<T, Alloc>
-{
-    using A = typename std::allocator_traits<Alloc>::template rebind_alloc<T>;
-    using traits = std::allocator_traits<A>;
-
-    A a{alloc};
-    T* p = traits::allocate(a, 1);
-
-    if constexpr (ndof::exceptions_feature_enabled()) {
-        allocation_detail::construct_or_rethrow(
-            a, p, std::forward<Args>(args)...);
-    }
-    else {
-        if (!p)
-            return std::unexpected(allocation_error::allocation_failed);
-        traits::construct(a, p, std::forward<Args>(args)...);
+        return allocated_unique_ptr<T>{p, deallocating_deleter<T>{a, count}};
     }
 
-    return allocated_unique_t<T, Alloc>{
-        p, deallocating_deleter<T, Alloc>{a}};
-}
+    template<typename T, typename Alloc>
+        requires unbounded_array<T>
+    auto make_unique_with_allocator(Alloc alloc, std::size_t count) noexcept(!ndof::exceptions_feature_enabled())
+        -> allocation_result_t<T> {
+        using element_type = std::remove_extent_t<T>;
+        using A = typename std::allocator_traits<Alloc>::template rebind_alloc<element_type>;
+        using traits = std::allocator_traits<A>;
 
-template<class T, class Alloc>
-    requires bounded_array<T>
-auto make_unique_with_allocator(Alloc alloc)
-    -> allocation_result_t<T, Alloc>
-{
-    using element_type = std::remove_extent_t<T>;
-    using A = typename std::allocator_traits<Alloc>::template rebind_alloc<element_type>;
-    using traits = std::allocator_traits<A>;
+        A a{alloc};
+        element_type* p = traits::allocate(a, count);
 
-    A a{alloc};
-    constexpr std::size_t count = std::extent_v<T>;
-    element_type* p = traits::allocate(a, count);
+        if constexpr (ndof::exceptions_feature_enabled()) {
+            detail::construct_array(a, p, count);
+        }
+        else {
+            if (!p && count != 0) {
+                return std::unexpected(allocation_error::allocation_failed);
+            }
+            for (std::size_t constructed = 0; constructed < count; ++constructed) {
+                traits::construct(a, p + constructed);
+            }
+        }
 
-    if constexpr (ndof::exceptions_feature_enabled()) {
-        allocation_detail::construct_array_or_rethrow(a, p, count);
+        return allocated_unique_ptr<T> {
+            p, deallocating_deleter<T>{a, count}
+        };
     }
-    else {
-        if (!p)
-            return std::unexpected(allocation_error::allocation_failed);
-        for (std::size_t constructed = 0; constructed < count; ++constructed)
-            traits::construct(a, p + constructed);
-    }
-
-    return allocated_unique_t<T, Alloc>{
-        p, deallocating_deleter<T, Alloc>{a, count}};
-}
-
-template<class T, class Alloc>
-    requires unbounded_array<T>
-auto make_unique_with_allocator(Alloc alloc, std::size_t count)
-    -> allocation_result_t<T, Alloc>
-{
-    using element_type = std::remove_extent_t<T>;
-    using A = typename std::allocator_traits<Alloc>::template rebind_alloc<element_type>;
-    using traits = std::allocator_traits<A>;
-
-    A a{alloc};
-    element_type* p = traits::allocate(a, count);
-
-    if constexpr (ndof::exceptions_feature_enabled()) {
-        allocation_detail::construct_array_or_rethrow(a, p, count);
-    }
-    else {
-        if (!p && count != 0)
-            return std::unexpected(allocation_error::allocation_failed);
-        for (std::size_t constructed = 0; constructed < count; ++constructed)
-            traits::construct(a, p + constructed);
-    }
-
-    return allocated_unique_t<T, Alloc>{
-        p, deallocating_deleter<T, Alloc>{a, count}};
-}
+} // namespace ndof
+    // In exception-free mode, recoverable allocation failures are returned;
+    // any unexpected exception terminates at this noexcept boundary.

@@ -1,19 +1,14 @@
 #if !defined(NDOF_ERROR_ALLOCATOR_SUPPORT_HPP)
 #define NDOF_ERROR_ALLOCATOR_SUPPORT_HPP
 
+#include "configs.hpp"
+
 #include <concepts>
 #include <expected>
 #include <memory>
 // TODO: Conditionally include.
 #include <type_traits>
- 
 
-
-// Note: GitHub Copilot Pro is designed for individuals who want more flexibility. 
-//       This paid plan includes unlimited completions, access to a selection of models, Copilot cloud agent, 
-//       and a monthly allowance of AI credits. 
-//       Verified teachers, and maintainers of popular open source projects may be eligible for free access.
-//                ^^^^^^^^      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 // Wrapping ndof exceptions as inner exceptions preserves a rethrow chain that can
 // later be rendered as a stack trace.
@@ -99,6 +94,20 @@ rebound_default_allocator_t<T> get_rebound_default_allocator() noexcept {
     return rebound_default_allocator_t<T>(get_default_allocator());
 }
 
+template<allocator_like Alloc>
+[[nodiscard]] consteval bool allocator_is_nothrow_deallocate() {
+    return noexcept(std::allocator_traits<Alloc>::deallocate(
+        std::declval<Alloc&>(), 
+        std::declval<typename std::allocator_traits<Alloc>::pointer>(), 
+        std::declval<typename std::allocator_traits<Alloc>::size_type>())
+    );
+}
+
+// TODO: Consider a better name.
+template<allocator_like Alloc>
+[[nodiscard]] consteval bool is_no_throw_with_allocator()  noexcept {
+    return (!ndof::exceptions_feature_enabled()) || allocator_is_nothrow_deallocate<Alloc>();
+}
 
 
 } // namespace ndof::error

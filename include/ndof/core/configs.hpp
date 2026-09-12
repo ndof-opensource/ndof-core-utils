@@ -20,6 +20,10 @@
 // Example: auto [passed, name] = NDOF_CAPTURE_BOOL_TEST(x > 0);
 #define NDOF_CAPTURE_BOOL_TEST(test_expression) static_cast<bool>(test_expression), #test_expression
 
+#if !defined(NDOF_AVOID_IMPLICIT_HEAP_ALLOCATION) 
+#define NDOF_AVOID_IMPLICIT_HEAP_ALLOCATION 0
+#endif
+
 #if !defined(NDOF_RTTI_FEATURE_ENABLED)
 //-fno-rtti (GCC/Clang) or /GR- (MSVC
 #if defined(__cpp_rtti)        || (defined(_CPPRTTI)  && defined(_MSC_VER)) \
@@ -32,8 +36,9 @@
 
 
 // Determine whether C++ exceptions are enabled based on standard compiler switches.
+// Since exceptions may allocate on the heap, we disable them if implicit heap allocation is avoided.
 #if !defined(NDOF_EXCEPTIONS_FEATURE_ENABLED)
-#if defined(__cpp_exceptions) || (defined(_CPPUNWIND) && defined(_MSC_VER))
+#if (defined(__cpp_exceptions) || (defined(_CPPUNWIND) && defined(_MSC_VER))) && NDOF_AVOID_IMPLICIT_HEAP_ALLOCATION == 0
 #define NDOF_EXCEPTIONS_FEATURE_ENABLED 1
 #else
 #define NDOF_EXCEPTIONS_FEATURE_ENABLED 0
@@ -44,21 +49,25 @@
 // Determine whether C++ thread support is enabled. __STDCPP_THREADS__ is the
 // standard library feature macro; the remaining checks cover common standard
 // library/compiler configurations that do not expose it.
+// If the heap is to be avoided, we also disable thread support.
 #if !defined(NDOF_THREADS_FEATURE_ENABLED)
-#if (defined(__STDCPP_THREADS__) && __STDCPP_THREADS__ == 1) \
+#if ((defined(__STDCPP_THREADS__) && __STDCPP_THREADS__ == 1) \
     || (defined(_MSC_VER) && defined(_MT)) \
     || (defined(_GLIBCXX_HAS_GTHREADS) && _GLIBCXX_HAS_GTHREADS) \
     || defined(__GTHREADS) \
     || defined(_LIBCPP_HAS_THREAD_API_PTHREAD) \
-    || defined(_LIBCPP_HAS_THREAD_API_WIN32)
+    || defined(_LIBCPP_HAS_THREAD_API_WIN32)) \
+    && NDOF_AVOID_IMPLICIT_HEAP_ALLOCATION == 0
 #define NDOF_THREADS_FEATURE_ENABLED 1
 #else
 #define NDOF_THREADS_FEATURE_ENABLED 0
 #endif
 #endif
 
-
 namespace ndof {
+consteval bool avoid_implicit_heap_allocation() noexcept {
+    return NDOF_AVOID_IMPLICIT_HEAP_ALLOCATION != 0;
+}
 
 [[nodiscard]] consteval bool exceptions_feature_enabled() noexcept {
 #if defined(NDOF_EXCEPTIONS_FEATURE_ENABLED) && NDOF_EXCEPTIONS_FEATURE_ENABLED == 1
@@ -144,6 +153,9 @@ using default_char_traits_t = Traits<CharT>;
 #define NDOF_BUILD_MODE ::ndof::build_mode::debug
 #endif
 #endif
+
+
+
 
 using default_string_view = std::basic_string_view<ndof::default_char_t, default_char_traits_t<default_char_t>>;
 
